@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exchange Rate Converter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>💱 Exchange Rate Converter</h1>
+
+    <div class="converter">
+      <label for="amount">Amount:</label>
+      <input type="number" id="amount" placeholder="e.g. 100" value="1">
+
+      <div class="currency-row">
+        <div>
+          <label for="from">From:</label>
+          <input type="text" id="from" placeholder="e.g. USD" value="USD">
+        </div>
+
+        <button id="swapBtn" title="Swap currencies">🔁</button>
+
+        <div>
+          <label for="to">To:</label>
+          <input type="text" id="to" placeholder="e.g. INR" value="INR">
+        </div>
+      </div>
+
+      <button id="convertBtn">Convert</button>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
