@@ -1,0 +1,4 @@
+# local config / secrets
+config.js
+.env
+node_modules/

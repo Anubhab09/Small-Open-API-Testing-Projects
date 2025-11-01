@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Weather App</title>
+  <style>
+    :root{
+      --bg:#0f1724; /* deep navy */
+      --card:#0b1220;
+      --accent:#56b6f0;
+      --muted:#9aa6b2;
+      --glass: rgba(255,255,255,0.04);
+      --success: #10b981;
+      --danger: #ef4444;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background: linear-gradient(180deg,var(--bg), #071022 120%);
+      color:#e6eef6;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      gap:20px;
+    }
+
+    .app{
+      width:100%;
+      max-width:900px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:16px;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+      padding:22px;
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      gap:20px;
+      align-items:start;
+    }
+
+    .panel{
+      background:var(--card);
+      border-radius:12px;
+      padding:18px;
+      backdrop-filter: blur(6px);
+    }
+
+    header h1{margin:0 0 6px 0;font-size:20px}
+    header p{margin:0;color:var(--muted);font-size:13px}
+
+    .search {
+      margin-top:14px;
+      display:flex;gap:10px;
+    }
+    .search input{
+      flex:1;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:var(--glass);color:inherit;font-size:15px;
+    }
+    .search button{
+      padding:0 14px;border-radius:10px;border:none;background:linear-gradient(180deg,var(--accent),#2b9fe0);color:#042533;font-weight:700;font-size:15px;cursor:pointer;
+    }
+
+    .info{
+      display:flex;flex-direction:column;gap:12px;margin-top:16px;
+    }
+    .stat{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02);}
+    .stat small{color:var(--muted)}
+
+    .main{
+      padding:18px 22px;
+      display:flex;flex-direction:column;gap:12px;
+    }
+
+    .weather-card{display:flex;gap:18px;align-items:center}
+    .weather-card .meta{display:flex;flex-direction:column}
+    .temp{font-size:56px;font-weight:700;line-height:1}
+    .cond{font-size:16px;color:var(--muted)}
+
+    .details-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
+
+    .aqi{padding:12px;border-radius:10px;background:rgba(255,255,255,0.02)}
+
+    .message{padding:10px;border-radius:8px;background:rgba(0,0,0,0.25);color:var(--muted);font-size:14px}
+
+    footer{margin-top:8px;color:var(--muted);font-size:13px}
+
+    /* responsive */
+    @media (max-width:800px){
+      .app{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <main class="app" role="main">
+    <section class="panel" aria-labelledby="appTitle">
+      <header>
+        <h1 id="appTitle">Weather Checker</h1>
+        <p>Enter a city, town, village or zip/postcode. This app uses WeatherAPI (you provided the key).</p>
+      </header>
+
+      <div class="search" role="search">
+        <input id="locationInput" type="search" placeholder="e.g. London, New York, 94040" aria-label="Location input" />
+        <button id="searchBtn" aria-label="Search weather">Check</button>
+      </div>
+
+      <div class="info" id="infoArea">
+        <div class="message" id="hint">Type a location and hit <strong>Check</strong> — or press Enter.</div>
+      </div>
+
+      <footer>
+        <div>Powered by <strong>WeatherAPI.com</strong>.</div>
+        <div style="margin-top:6px;color:var(--muted)">Tip: try city name, city & country ("Paris, FR") or postal code.</div>
+      </footer>
+    </section>
+
+    <section class="main panel" aria-live="polite" id="resultPanel">
+      <div id="resultEmpty" class="message">No data yet — results will appear here.</div>
+
+      <!-- populated by JS -->
+    </section>
+  </main>
+  <script src="config.js"></script>
+  
+  <script>
+    // Weather app using the API key / base the user provided.
+    const API_KEY = window.WEATHER_KEY || '';
+
+    if(!API_KEY){
+    // show helpful message instead of embedding the key
+    document.getElementById('infoArea').innerHTML = '<div class="message" style="color:#f59e0b">No API key found. Create a local <code>config.js</code> with your WeatherAPI key.</div>';
+    // optionally disable the search button
+    document.getElementById('searchBtn').disabled = true;
+    }
+    const BASE = 'http://api.weatherapi.com/v1/current.json';
+
+    const $input = document.getElementById('locationInput');
+    const $btn = document.getElementById('searchBtn');
+    const $info = document.getElementById('infoArea');
+    const $resultPanel = document.getElementById('resultPanel');
+    const $resultEmpty = document.getElementById('resultEmpty');
+
+    function setHint(html){ $info.innerHTML = html; }
+
+    function showLoading(){
+      $resultPanel.innerHTML = '<div class="message">Loading weather…</div>';
+    }
+
+    function showError(msg){
+      $resultPanel.innerHTML = `<div class="message" style="color:var(--danger)">${escapeHtml(msg)}</div>`;
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+    }
+
+    function render(data){
+      // data structure per WeatherAPI current.json
+      const { location, current } = data;
+      const localTime = location.localtime; // "2025-11-01 08:00"
+      const html = `
+        <div class="weather-card">
+          <img src="${escapeHtml(current.condition.icon)}" alt="${escapeHtml(current.condition.text)} icon" width="96" height="96" />
+          <div class="meta">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div>
+                <div class="temp">${Math.round(current.temp_c)}°C</div>
+                <div class="cond">${escapeHtml(current.condition.text)}</div>
+              </div>
+            </div>
+            <div style="margin-top:8px;color:var(--muted)">Location: <strong>${escapeHtml(location.name)}</strong>, ${escapeHtml(location.region || location.country)}</div>
+            <div style="margin-top:6px;color:var(--muted)">Local time: <strong>${escapeHtml(localTime)}</strong></div>
+          </div>
+        </div>
+
+        <div class="details-grid" style="margin-top:14px">
+          <div class="stat"><div><small>Feels like</small><div>${Math.round(current.feelslike_c)}°C</div></div><div><small>Humidity</small><div>${current.humidity}%</div></div></div>
+          <div class="stat"><div><small>Wind</small><div>${current.wind_kph} kph (${current.wind_dir})</div></div></div>
+          <div class="stat"><div><small>Pressure</small><div>${current.pressure_mb} mb</div></div></div>
+          <div class="stat"><div><small>UV index</small><div>${current.uv}</div></div></div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+          <div class="aqi"><small>Air quality (if available)</small><div style="font-weight:700;margin-top:6px">${current.air_quality ? formatAQI(current.air_quality) : 'N/A'}</div></div>
+          <div style="color:var(--muted);font-size:13px">Last updated: ${escapeHtml(current.last_updated)}</div>
+        </div>
+      `;
+
+      $resultPanel.innerHTML = html;
+    }
+
+    function formatAQI(aq){
+      // WeatherAPI returns component values (us-epa-index may or may not be present)
+      if(aq['us-epa-index']){
+        const v = aq['us-epa-index'];
+        const labels = ['Good','Moderate','Unhealthy for Sensitive','Unhealthy','Very Unhealthy','Hazardous'];
+        const label = labels[Math.min(Math.max(Math.round(v)-1,0),labels.length-1)] || String(v);
+        return `${label} (US EPA index ${v})`;
+      }
+      // otherwise show main pollutant concentrations (pm2_5 etc.)
+      const parts = [];
+      if(aq.pm2_5) parts.push(`PM2.5: ${Math.round(aq.pm2_5)}`);
+      if(aq.pm10) parts.push(`PM10: ${Math.round(aq.pm10)}`);
+      if(aq.o3) parts.push(`O₃: ${Math.round(aq.o3)}`);
+      if(parts.length) return parts.join(' · ');
+      return 'Data not available';
+    }
+
+    async function fetchWeather(location){
+      const q = encodeURIComponent(location);
+      const url = `${BASE}?key=${API_KEY}&q=${q}&aqi=yes`;
+      showLoading();
+      try{
+        const resp = await fetch(url);
+        if(!resp.ok){
+          // try to parse error JSON
+          let errText = `HTTP ${resp.status}`;
+          try{ const err = await resp.json(); if(err && err.error && err.error.message) errText = err.error.message; }catch(e){}
+          throw new Error(errText);
+        }
+        const data = await resp.json();
+        render(data);
+      }catch(err){
+        showError('Could not load weather: ' + err.message);
+      }
+    }
+
+    // event handlers
+    $btn.addEventListener('click', () => {
+      const loc = $input.value.trim();
+      if(!loc) { setHint('<div class="message">Please enter a location.</div>'); return; }
+      setHint('<div class="message">Searching for <strong>' + escapeHtml(loc) + '</strong>…</div>');
+      fetchWeather(loc);
+    });
+
+    $input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ $btn.click(); } });
+
+    // small enhancement: geolocation button with permission (optional)
+    (function addGeoButton(){
+      const geoBtn = document.createElement('button');
+      geoBtn.textContent = 'Use my location';
+      geoBtn.style.marginTop = '12px';
+      geoBtn.style.padding = '8px 12px';
+      geoBtn.style.borderRadius = '10px';
+      geoBtn.style.border = 'none';
+      geoBtn.style.cursor = 'pointer';
+      geoBtn.setAttribute('title','Find weather for your current location');
+      geoBtn.addEventListener('click', ()=>{
+        if(!navigator.geolocation){ setHint('<div class="message">Geolocation is not supported by your browser.</div>'); return; }
+        setHint('<div class="message">Locating…</div>');
+        navigator.geolocation.getCurrentPosition(pos=>{
+          const lat = pos.coords.latitude.toFixed(5);
+          const lon = pos.coords.longitude.toFixed(5);
+          const loc = `${lat},${lon}`;
+          $input.value = loc;
+          fetchWeather(loc);
+        }, err=>{
+          setHint('<div class="message">Could not get your location: ' + (err.message || 'permission denied') + '</div>');
+        });
+      });
+      document.querySelector('.panel').appendChild(geoBtn);
+    })();
+
+    // accessibility: focus input on load
+    window.addEventListener('load', ()=>{ $input.focus(); });
+  </script>
+</body>
+</html>
